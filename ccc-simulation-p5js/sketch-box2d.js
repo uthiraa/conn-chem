@@ -1,24 +1,30 @@
 var moleculeArray = [];
+var boundary;
+var piston;
 
 var imageDir = "img/svg/";
 
 var numberOfParticles = 20;
 
 function preload() {
+
 }
 
 function setup() {
-    // Creates drawing canvas for P5 objects
+    // Creates the drawing canvas
     createCanvas(800, 600);
-
-    // Adjust framerate to slow animation, useful for debugging
-    // frameRate(5);
 
     // Sets all x,y coordinates to the center of images
     imageMode(CENTER);
 
-    // Sets the line thickness of shapes
-    strokeWeight(3);
+    // Initiates a new b2 world, scaling factor = 30, gravity vector
+    b2newWorld(30, createVector(0, 9.8));
+
+    // Creates the boundary for a closed reaction container
+    boundary = new Boundary("CLOSED");
+
+    // Creates the piston boundary for the reaction container
+    piston = new Boundary("PISTON", createVector(width / 2, 0), createVector(width, 20))
 
     // Calculates how many rows of particles to draw, currently assumes 5 columns of particles
     var rowsOfParticles = Math.floor(numberOfParticles / 5)
@@ -31,61 +37,50 @@ function setup() {
     // Creates molecule collection in a grid with random velocity vectors
     for (var i = 0; i < rowsOfParticles; i++) {
         for (var j = 0; j < 5; j++) {
-            moleculeArray[5 * i + j] = new Particle(161, createVector(width / 10 + (j * (width / 5)), height / 10 + i * (height / 10)), p5.Vector.random2D().mult(random(1,5)), 5 * i + j);
+            moleculeArray[5 * i + j] = new Particle(161, createVector(width / 10 + (j * (width / 5)), height / 10 + i * (height / 10)), p5.Vector.random2D().mult(random(1, 5)), 5 * i + j);
         }
     }
-
-    // Creates molecule collection with random velocity vectors
-    // More advanced behavior is handled above, this only creates one row of particles
-    // for (var i = 0; i < numberOfParticles; i++) {
-    //     moleculeArray[i] = new Particle(25, createVector((i + 1) * width / 5 - width / 10, height / 4), p5.Vector.random2D().mult(4), i);
-    // }
-
 }
 
 function draw() {
     // The background must be redrawn with each draw loop to avoid molecules leaving permanent traces
     background(204, 204, 204);
 
-    // Kinetic energy reset after each loop
-    var systemKineticEnergy = 0;
+    // Physics calculations must be updated each draw by calling b2Update
+    b2Update();
+    b2Draw(false);
+}
 
-    // Array of particles - this is iterated on each draw loop to render the objects to the canvas
-    for (var i = 0; i < numberOfParticles; i++) {
-        moleculeArray[i].drawParticle();
-        moleculeArray[i].checkCollision();
+function attr(body, fixture, position) {
+    if (body.type(0) == 'box') fill(255, 0, 0);
+    else fill(0, 0, 255);
+    b2Display(body, fixture, position);
+}
 
-        for (var j = 0; j < numberOfParticles; j++) {
-            if ((moleculeArray[i].id == moleculeArray[j].id) || moleculeArray[j].indexed) {
-                // console.log("skipped");
-                continue;
-            } else {
-                // console.log("checking for collision");
-                moleculeArray[i].checkParticleCollision(moleculeArray[j]);
-            }
+// Boundary class to create common boundary types
+class Boundary {
+
+    constructor(type, position, dimensions) {
+        // Creates a closed container to bound the entire system
+        if (type.toUpperCase() == "CLOSED") {
+            this.bottom = new b2Body('box', false, createVector(width / 2, height), createVector(width, 1));
+            this.left = new b2Body('box', false, createVector(0, height / 2), createVector(1, height));
+            this.right = new b2Body('box', false, createVector(width, height / 2), createVector(1, height));
+            this.top = new b2Body('box', false, createVector(width / 2, 0), createVector(width, 1));
         }
 
-        moleculeArray[i].updatePosition();
-        moleculeArray[i].updateKineticEnergy();
-
-        // moleculeArray[i].showLabel();
-        // moleculeArray[i].showVelocity();
-        // moleculeArray[i].log();
+        // Creates a horizontal boundary for the piston 
+        if (type.toUpperCase() == "PISTON") {
+            this.piston = new b2Body('box', false, createVector(position.x, position.y), createVector(dimensions.x, dimensions.y));
+            this.piston.display(this.drawBoundary, 0);
+        }
     }
 
-    // Loop to update properties and variables after positions and velocities have been calculated
-    for (var i = 0; i < numberOfParticles; i++) {
-        // Resets the boolean for whether a particular molecule was already iterated over
-        // This is is meant to trim down the number of collision calculations being performed each loop
-        moleculeArray[i].indexed = false;
-
-        // Get KE of each particle
-        systemKineticEnergy += moleculeArray[i].getKineticEnergy();
+    drawBoundary(body, fixture, position) {
+        fill(150, 150, 150);
+        rect(position.x, position.y, body.wh(0).x, body.wh(0).y)
+        // b2Display(body, fixture, position);
     }
-
-    // Display KE of system
-    // text(systemKineticEnergy, width / 2, height - 20);
-
 }
 
 // Particle class to handle each particle and its properties
@@ -108,96 +103,22 @@ class Particle {
         this.velocity = createVector(velocity.x, velocity.y)
 
         // Initializes the particle mass
-        this.mass = (random() < 0.5) ? 1 : 2;
+        this.mass = 1;
 
         // Sets the KE of the particle
         this.kineticEnergy = this.getKineticEnergy();
 
         // Sets the image reference for using the ID number of the particle
         this.imageUrl = imageDir + database[this.databaseKey - 1].file;
-        this.imageObject = loadImage(this.imageUrl);
+        this.imageObject = loadImage(this.imageUrl, (result) => {
 
-        // Collision is a class that allows you to reference which particles were in a collision, useful for post collision behavior
-        this.collision = null;
+            this.drawParticle(result);
 
-        // Keeps track of whether a molecule was already indexed in a pass of velocity calculations. 
-        // Velocity is already set by partner particle, so recalculating it with the same method would give the wrong result
-        this.indexed = false;
+        });
+
 
     }
 
-    /**
-     * Collision detection functions
-     */
-
-    // Checks whether the particle collides with the boundary
-    checkCollision() {
-        // Calculates the width of the particle glyph
-        var imageWidth = this.imageObject.width;
-        var imageHeight = this.imageObject.height;
-
-        // Checks if width of object is within horizontal collision distance of boundary
-        if (this.position.x < imageWidth / 2.0 || (width - this.position.x) < imageWidth / 2.0) {
-
-            // This logic handles the case where particles get stuck to the wall
-            if (this.position.x > width / 2) {
-                this.velocity.x = -abs(this.velocity.x);
-            } else {
-                this.velocity.x = abs(this.velocity.x);
-            }
-        }
-
-        // Check if height of object is within vertical collision distance of boundary
-        if (this.position.y < imageHeight / 2.0 || (height - this.position.y) < imageHeight / 2.0) {
-
-            // This logic handles the case where particles get stuck to the wall
-            if (this.position.y > height / 2) {
-                this.velocity.y = -abs(this.velocity.y);
-            } else {
-                this.velocity.y = abs(this.velocity.y);
-            }
-        }
-    }
-
-    // Checks whether two particles are going to collide
-    checkParticleCollision(particle) {
-        var distanceBetweenParticles = p5.Vector.sub(particle.position, this.position).mag();
-        var collisionDistance = this.getRadius() + particle.getRadius();
-
-        // Evaluates whether the particles are within a collision radius of one another
-        if (distanceBetweenParticles <= collisionDistance) {
-
-            // If there is currently no collision object stored on this class, that means the particle could collide
-            if (this.collision == null) {
-
-                // Updating this particle
-                this.collision = new Collision(this, particle);
-                var dv1 = this.collision.calculateVelocityVersion2();
-
-                // Updating other particle
-                particle.collision = new Collision(particle, this);
-                var dv2 = particle.collision.calculateVelocityVersion2();
-
-                // Updating both velocities, note that we must find the value of the velocities first before updating since the calculations of both require the initial state values
-                this.velocity.add(dv1);
-                particle.velocity.add(dv2);
-
-                particle.indexed = true;
-
-            }
-
-        }
-        // This branch is very important because it prevents velocities from updating while particles are still within collision distance of one another
-        // Without setting this, the particle behavior after collision was very erratic
-        else if (distanceBetweenParticles > collisionDistance) {
-            // This checks if the other particle is indexed in the current collision object
-            if (this.collision != null && this.collision.contains(particle)) {
-                this.collision = null;
-                particle.collision = null;
-            }
-        }
-
-    }
 
     /**
      * Calculate properties of particle
@@ -241,19 +162,39 @@ class Particle {
         this.velocity.y = velocity.y;
     }
 
+    // Sets the x,y position based on the arguments
+    setPosition(position) {
+        this.position.x = position.x;
+        this.position.y = position.y;
+    }
+
 
     /*
     * Rendering functions
     */
 
     // Renders the image glyph to canvas using P5.js Image object
-    drawParticle() {
-        image(this.imageObject, this.position.x, this.position.y);
+    drawParticle(imageObject) {
+        // Creats b2 Body to interact with b2 world
+        // This must be called asychronously after the image is loaded
+        this.body = new b2Body('box', true, createVector(this.position.x, this.position.y), createVector(this.imageObject.width, this.imageObject.height));
+        this.body.image(imageObject, 0);
+
+        // Sets friction of each particle
+        this.body.friction = 0;
+
+        // Sets the restitution of the particle
+        this.body.bounce = 1.0;
+
+        // Set particle velocity
+        this.body.applyForce(createVector(this.velocity.x, this.velocity.y), 100);
+
+        // Sets position on the class variable
+        this.setPosition(this.body.xy);
     }
 
     // Displays a velocity vector representation for each particle
     showVelocity() {
-
         line(this.position.x, this.position.y, (this.position.x + 3 * this.velocity.x), (this.position.y + 3 * this.velocity.y));
     }
 
@@ -276,46 +217,6 @@ class Particle {
         return "This particle has the chemical identity '" + this.name + "'";
     }
 
-};
-
-class Collision {
-    constructor(particle1, particle2) {
-        this.particle1 = particle1;
-        this.particle2 = particle2;
-    }
-
-    // Calculates the post collision velocity 
-    calculateVelocity() {
-
-        var reducedMass = (2.0 * this.particle2.mass) / (this.particle1.mass + this.particle2.mass);
-        var dr = p5.Vector.sub(this.particle2.position, this.particle1.position);
-        dr.normalize();
-        var dot = dr.dot(this.particle1.velocity) * -1.0 * reducedMass;
-        dr.mult(dot);
-
-        return dr;
-    }
-
-    calculateVelocityVersion2() {
-        // var initialVelocity = createVector(this.velocity.x, this.velocity.y);
-        var reducedMass = (2.0 * this.particle2.mass) / (this.particle1.mass + this.particle2.mass);
-        var dx = p5.Vector.sub(this.particle1.position, this.particle2.position);
-        var dxmag = dx.mag();
-        var dv = p5.Vector.sub(this.particle1.velocity, this.particle2.velocity);
-
-        var dotProduct = p5.Vector.dot(dv, dx);
-
-        return dx.mult((-reducedMass * dotProduct) / Math.pow(dxmag, 2));
-    }
-
-    // Returns true if the particle in the argument is one of the particles involved in the collision
-    contains(particle) {
-        return (particle.id == this.particle1.id || particle.id == this.particle2.id) ? true : false;
-    }
-
-    toString() {
-        return "This collision contains particle " + this.particle1.id + " and particle " + this.particle2.id;
-    }
 };
 
 // Array of Javascript objects containing names and file locations for different species
