@@ -112,6 +112,8 @@ class Particle {
         this.imageUrl = imageDir + database[this.databaseKey - 1].file;
         this.imageObject = loadImage(this.imageUrl, (result) => {
 
+            // We have to invoke the callback function since loading images are done asynchronously
+            // The result, the image object, is then passed to the drawParticle method
             this.drawParticle(result);
 
         });
@@ -175,8 +177,8 @@ class Particle {
 
     // Renders the image glyph to canvas using P5.js Image object
     drawParticle(imageObject) {
-        // Creats b2 Body to interact with b2 world
-        // This must be called asychronously after the image is loaded
+        // Creates b2 Body to interact with b2 world
+        // This is called asychronously after the image is loaded
         this.body = new b2Body('box', true, createVector(this.position.x, this.position.y), createVector(this.imageObject.width, this.imageObject.height));
         this.body.image(imageObject, 0);
 
