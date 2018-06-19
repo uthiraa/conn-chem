@@ -118,7 +118,6 @@ class Particle {
 
         });
 
-
     }
 
 
@@ -179,11 +178,14 @@ class Particle {
     drawParticle(imageObject) {
         // Creates b2 Body to interact with b2 world
         // This is called asychronously after the image is loaded
-        this.body = new b2Body('box', true, createVector(this.position.x, this.position.y), createVector(this.imageObject.width, this.imageObject.height));
+        this.body = new b2Body('type', true, createVector(this.position.x, this.position.y), 
+            createVector(this.imageObject.width, this.imageObject.height), 1, 0, 1);
         this.body.image(imageObject, 0);
 
+        this.body.density = 0;
+
         // Sets friction of each particle
-        this.body.friction = 0;
+        this.body.friction = 1.0;
 
         // Sets the restitution of the particle
         this.body.bounce = 1.0;
