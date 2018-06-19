@@ -165,7 +165,7 @@ class Particle {
 
     getRotationalKineticEnergy() {
         // TO BE IMPLEMENTED
-        return (!(typeof this.body == 'undefined')) ? 0 : 0;
+        return (!(typeof this.body == 'undefined')) ? ((1/24) * this.body.mass * Math.pow(this.body.angularVelocity, 2) * (Math.pow(this.imageObject.width, 2) + Math.pow(this.imageObject.height, 2))) : 0;
     }
 
     /**
