@@ -2,6 +2,8 @@ var moleculeArray = [];
 var boundary;
 var piston;
 
+var systemKineticEnergy;
+
 var imageDir = "img/svg/";
 
 var numberOfParticles = 20;
@@ -46,15 +48,21 @@ function draw() {
     // The background must be redrawn with each draw loop to avoid molecules leaving permanent traces
     background(204, 204, 204);
 
+    // Resets the KE of the system each draw loop
+    systemKineticEnergy = 0;
+
     // Physics calculations must be updated each draw by calling b2Update
     b2Update();
     b2Draw(false);
-}
 
-function attr(body, fixture, position) {
-    if (body.type(0) == 'box') fill(255, 0, 0);
-    else fill(0, 0, 255);
-    b2Display(body, fixture, position);
+    // Iterates over particles to calculate particle energy and update system KE
+    for (var i = 0; i<numberOfParticles; i++) {
+        moleculeArray[i].updateKineticEnergy();
+        systemKineticEnergy += moleculeArray[i].getKineticEnergy();
+    }
+
+    // Displays a readout of the system KE
+    text(systemKineticEnergy, width/2, height-10);
 }
 
 // Boundary class to create common boundary types
@@ -106,7 +114,7 @@ class Particle {
         this.mass = 1;
 
         // Sets the KE of the particle
-        this.kineticEnergy = this.getKineticEnergy();
+        this.kineticEnergy = 0;
 
         // Sets the image reference for using the ID number of the particle
         this.imageUrl = imageDir + database[this.databaseKey - 1].file;
@@ -120,18 +128,18 @@ class Particle {
 
     }
 
-
     /**
      * Calculate properties of particle
      */
 
-    // Updates the x,y coordinates of the particle
-    updatePosition() {
-        this.position.add(this.velocity);
-    }
-
     updateKineticEnergy() {
-        this.kineticEnergy = 0.5 * this.mass * Math.pow(this.velocity.mag(), 2);
+
+        // Check first that this.body is defined
+        if (!(typeof this.body == 'undefined')){
+
+            // Then the kinetic energy is calculated
+            this.kineticEnergy = this.getTranslationalKineticEnergy() + this.getRotationalKineticEnergy();
+        }
     }
 
     /**
@@ -140,17 +148,24 @@ class Particle {
 
     // Returns a P5 Vector containing the particle velocity
     getVelocity() {
-        return this.velocity;
+        return (!(typeof this.body == 'undefined')) ? this.body.velocity : this.velocity;
     }
 
-    // Provides logic to determine the collision radius of the particle
-    getRadius() {
-        // Returns the max value of the image width, this will need to be tweaked for long molecules like pentane
-        return (this.imageObject.width >= this.imageObject.height) ? this.imageObject.width / 2.0 : this.imageObject.height / 2.0;
+    getPosition() {
+        return (!(typeof this.body == 'undefined')) ? this.body.xy : this.position;
     }
 
     getKineticEnergy() {
         return this.kineticEnergy;
+    }
+
+    getTranslationalKineticEnergy() {
+        return (!(typeof this.body == 'undefined')) ? (0.5 * this.body.mass * Math.pow(this.body.velocity.mag(), 2)) : 0;
+    }
+
+    getRotationalKineticEnergy() {
+        // TO BE IMPLEMENTED
+        return (!(typeof this.body == 'undefined')) ? 0 : 0;
     }
 
     /**
@@ -169,7 +184,6 @@ class Particle {
         this.position.y = position.y;
     }
 
-
     /*
     * Rendering functions
     */
@@ -178,17 +192,8 @@ class Particle {
     drawParticle(imageObject) {
         // Creates b2 Body to interact with b2 world
         // This is called asychronously after the image is loaded
-        this.body = new b2Body('type', true, createVector(this.position.x, this.position.y), 
-            createVector(this.imageObject.width, this.imageObject.height), 1, 0, 1);
+        this.body = new b2Body('type', true, createVector(this.position.x, this.position.y), createVector(this.imageObject.width, this.imageObject.height), 1.0, 0, 1.0);
         this.body.image(imageObject, 0);
-
-        this.body.density = 0;
-
-        // Sets friction of each particle
-        this.body.friction = 1.0;
-
-        // Sets the restitution of the particle
-        this.body.bounce = 1.0;
 
         // Set particle velocity
         this.body.applyForce(createVector(this.velocity.x, this.velocity.y), 100);
@@ -213,7 +218,12 @@ class Particle {
 
     // Writes particle ID, position, and velocity to the console
     log() {
-        console.log(this.id + "\t" + this.position.x + "\t" + this.position.y + "\t" + this.velocity.x + "\t" + this.velocity.y);
+        // console.log(this.id + "\t" + this.getPosition().x + "\t" + this.getPosition().y + "\t" + this.getVelocity().x + "\t" + this.getVelocity().y);
+        if (typeof(this.body) == "undefined") {
+            // Do nothing - this is necessary to wait until the object is created
+        } else {
+            console.log(this.body.velocity);
+        } 
     }
 
     // Provides a string representation of the Particle object

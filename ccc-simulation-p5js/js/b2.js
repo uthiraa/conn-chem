@@ -554,6 +554,13 @@ b2Body.prototype.toString = function () {
     var xy = b2scaleFrom(this.body.GetPosition());
     return xy.x.toFixed() + '/' + xy.y.toFixed() + ' ' + v.x.toFixed(2) + '/' + v.y.toFixed(2);
 }
+
+// b2Body.prototype.getVelocity = function () {
+//     console.log("Entering get velocity function");
+//     var v = b2scaleFrom(this.velocity);
+//     return createVector(v.x, v.y);
+// }
+
 var b2contacts=[];
 // ContactListener for collisions!
 function b2Listener() {
