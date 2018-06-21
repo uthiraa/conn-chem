@@ -227,7 +227,7 @@ class Particle {
         if (distance < 0.001) {
             distanceToParticle = 0.001
         } else {
-            distanceToParticle = distance / scaleFactor;
+            distanceToParticle = distance / scale;
         }
 
         forceToReturn = (((12 * A) / Math.pow(distanceToParticle, 13)) - ((6 * B) / Math.pow(distanceToParticle, 7)));
@@ -246,28 +246,32 @@ class Particle {
         return (!(typeof this.body == 'undefined')) ? this.body.velocity : this.velocity;
     }
 
+    // Returns the position in pixels of the particle
     getPosition() {
         return (!(typeof this.body == 'undefined')) ? this.body.xy : this.position;
     }
 
+    // Returns the kinetic energy (rotational + translational) of the particle
     getKineticEnergy() {
         return this.kineticEnergy;
     }
 
+    // Returns the translational kinetic energy of the particle
     getTranslationalKineticEnergy() {
         return (!(typeof this.body == 'undefined')) ? (0.5 * this.body.mass * Math.pow(this.body.velocity.mag(), 2)) : 0;
     }
 
+    // Returns the rotational kinetic energy of the particle
     getRotationalKineticEnergy() {
-        // TO BE IMPLEMENTED
         return (!(typeof this.body == 'undefined')) ? ((1 / 24) * this.body.mass * Math.pow(this.body.angularVelocity, 2) * (Math.pow(this.imageObject.width, 2) + Math.pow(this.imageObject.height, 2))) : 0;
     }
 
     // Takes the maximum dimension of the molecule sprite as an approximate radial extent of the molecule
     getRadius() {
-        return (!(typeof this.body == 'undefined')) ? Math.max(this.body.wh(0).x, this.body.wh(0).y) : Math.max(this.imageObject.width / 2.0, this.imageObject.height / 2.0);
+        return (!(typeof this.body == 'undefined')) ? Math.max(this.body.wh(0).x / 2.0, this.body.wh(0).y / 2.0) : Math.max(this.imageObject.width / 2.0, this.imageObject.height / 2.0);
     }
 
+    // Returns the net force vector (intermolecular forces)
     getNetForce() {
         return this.netForce;
     }
