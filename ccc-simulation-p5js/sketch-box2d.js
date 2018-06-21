@@ -19,6 +19,9 @@ function setup() {
     // Sets all x,y coordinates to the center of images
     imageMode(CENTER);
 
+    // Adjust framerate to slow animation, useful for debugging
+    // frameRate(5);
+
     // Initiates a new b2 world, scaling factor = 30, gravity vector
     b2newWorld(30, createVector(0, 9.8));
 
@@ -55,14 +58,37 @@ function draw() {
     b2Update();
     b2Draw(false);
 
-    // Iterates over particles to calculate particle energy and update system KE
-    for (var i = 0; i<numberOfParticles; i++) {
+    // Calculate intermolecular forces and calculate net force vector
+    // This is currently not working properly
+    for (var i = 0; i < numberOfParticles; i++) {
+        for (var j = 0; j < numberOfParticles; j++) {
+            if (moleculeArray[i].id == moleculeArray[j].id) {
+                continue;
+            } else if (moleculeArray[i].distanceToParticle(moleculeArray[j]) > (3.0 * moleculeArray[i].getRadius())) {
+                continue;
+            } else {
+                // var distanceVector = moleculeArray[i].vectorToParticle(moleculeArray[j]);
+                // var intermolecularForce = moleculeArray[i].calculateLJForce(distanceVector.mag(), 1.0, 1.0, 1.0);
+                // moleculeArray[i].addForce(distanceVector.mult(intermolecularForce));
+            }
+        }
+    }
+
+    // Iterates over particles to update system KE & apply forces
+    for (var i = 0; i < numberOfParticles; i++) {
+        // Calculates the KE of each particle
         moleculeArray[i].updateKineticEnergy();
+
+        // KE for each particle is added to the system KE for display
         systemKineticEnergy += moleculeArray[i].getKineticEnergy();
+
+        // Applies intermolecular force calculations
+        moleculeArray[i].applyForce();
+        // console.log(moleculeArray[i].getNetForce());
     }
 
     // Displays a readout of the system KE
-    text(systemKineticEnergy, width/2, height-10);
+    text(systemKineticEnergy, width / 2, height - 10);
 }
 
 // Boundary class to create common boundary types
@@ -113,6 +139,9 @@ class Particle {
         // Initializes the particle mass
         this.mass = 1;
 
+        // Net force vector on the particle
+        this.netForce = createVector(0, 0);
+
         // Sets the KE of the particle
         this.kineticEnergy = 0;
 
@@ -135,11 +164,77 @@ class Particle {
     updateKineticEnergy() {
 
         // Check first that this.body is defined
-        if (!(typeof this.body == 'undefined')){
+        if (!(typeof this.body == 'undefined')) {
 
             // Then the kinetic energy is calculated
             this.kineticEnergy = this.getTranslationalKineticEnergy() + this.getRotationalKineticEnergy();
         }
+    }
+
+    // Returns distance vector starting at this particle and pointing toward the particle in the argument
+    vectorToParticle(particle) {
+        return p5.Vector.sub(particle.getPosition(), this.getPosition());
+    }
+
+    // Returns the magnitude of the distance vector between two particles
+    distanceToParticle(particle) {
+        return this.vectorToParticle(particle).mag();
+    }
+
+    /**
+     * Calculate forces on the particle
+     */
+
+    // Adds a vector of a force affecting a particle 
+    addForce(force) {
+        this.netForce.add(force);
+    }
+
+    // Applies a force onto a particle using the b2 library
+    applyForce() {
+        if (!(typeof this.body == 'undefined')) {
+            var magnitude = this.netForce.mag();
+            this.body.applyForce(createVector(this.netForce.x / magnitude, this.netForce.y / magnitude), magnitude);
+        }
+    }
+
+    // Calculates the van der Waals force on a particle using a Lennard-Jones potential
+    // The Lennard-Jones potential is a mathematical simplification of the potential energy caused by van der Waals interactions
+    calculateLJForce(distance, a, b, scaleFactor) {
+        var distanceToParticle, A, B, scale, forceToReturn;
+
+        // Force cutoff may be necessary to prevent chaotic accelerations near collision radius
+        var forceCutoff = 3.0;
+
+        // Checks whether arguments were passed into the L-J function, if not they are set to a default value
+        if (typeof (a) == undefined && typeof (b) == undefined) {
+            A = 1.0;
+            B = 1.0;
+        } else {
+            A = a;
+            B = b;
+        }
+
+        // Sets a scale factor to increase or decrease force magnitude 
+        // this is purely so that the forces are on an appropriate scale relative to the particles
+        if (typeof (scaleFactor) == undefined) {
+            scale = 1.0;
+        } else {
+            scale = scaleFactor;
+        }
+
+        // Minimum distance threshhold (necessary?)
+        if (distance < 0.001) {
+            distanceToParticle = 0.001
+        } else {
+            distanceToParticle = distance / scaleFactor;
+        }
+
+        forceToReturn = (((12 * A) / Math.pow(distanceToParticle, 13)) - ((6 * B) / Math.pow(distanceToParticle, 7)));
+
+        // console.log(forceToReturn);
+
+        return Math.min(forceCutoff, forceToReturn);
     }
 
     /**
@@ -165,7 +260,16 @@ class Particle {
 
     getRotationalKineticEnergy() {
         // TO BE IMPLEMENTED
-        return (!(typeof this.body == 'undefined')) ? ((1/24) * this.body.mass * Math.pow(this.body.angularVelocity, 2) * (Math.pow(this.imageObject.width, 2) + Math.pow(this.imageObject.height, 2))) : 0;
+        return (!(typeof this.body == 'undefined')) ? ((1 / 24) * this.body.mass * Math.pow(this.body.angularVelocity, 2) * (Math.pow(this.imageObject.width, 2) + Math.pow(this.imageObject.height, 2))) : 0;
+    }
+
+    // Takes the maximum dimension of the molecule sprite as an approximate radial extent of the molecule
+    getRadius() {
+        return (!(typeof this.body == 'undefined')) ? Math.max(this.body.wh(0).x, this.body.wh(0).y) : Math.max(this.imageObject.width / 2.0, this.imageObject.height / 2.0);
+    }
+
+    getNetForce() {
+        return this.netForce;
     }
 
     /**
@@ -219,11 +323,11 @@ class Particle {
     // Writes particle ID, position, and velocity to the console
     log() {
         // console.log(this.id + "\t" + this.getPosition().x + "\t" + this.getPosition().y + "\t" + this.getVelocity().x + "\t" + this.getVelocity().y);
-        if (typeof(this.body) == "undefined") {
+        if (typeof (this.body) == "undefined") {
             // Do nothing - this is necessary to wait until the object is created
         } else {
             console.log(this.body.velocity);
-        } 
+        }
     }
 
     // Provides a string representation of the Particle object
