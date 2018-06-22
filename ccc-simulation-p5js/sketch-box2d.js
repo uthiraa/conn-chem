@@ -43,7 +43,7 @@ function setup() {
     // Creates molecule collection in a grid with random velocity vectors
     for (var i = 0; i < rowsOfParticles; i++) {
         for (var j = 0; j < 5; j++) {
-            moleculeArray[5 * i + j] = new Particle(161, createVector(width / 10 + (j * (width / 5)), height / 10 + i * (height / 10)), p5.Vector.random2D().mult(random(0, 1)), 5 * i + j);
+            moleculeArray[5 * i + j] = new Particle(161, createVector(width / 10 + (j * (width / 5)), height / 10 + i * (height / 10)), p5.Vector.random2D().mult(random(1, 5)), 5 * i + j);
         }
     }
 }
@@ -69,7 +69,7 @@ function draw() {
                 moleculeArray[i].indexes(moleculeArray[j]);
 
                 // Apply the force from the vdW interactions (to be implemented)
-                var ljVector = moleculeArray[i].calculateLJForce(moleculeArray[j], 1e2);
+                var ljVector = moleculeArray[i].calculateLJForce(moleculeArray[j]);
 
                 // Newton's 3rd Law
                 moleculeArray[i].addForceToNetForce(ljVector);
@@ -89,9 +89,10 @@ function draw() {
 
         // Applies intermolecular force calculations
         moleculeArray[i].applyNetForce();
-        console.log(moleculeArray[i].getNetForce());
+        // console.log(moleculeArray[i].getNetForce());
 
-        // Clears out force indices each draw loop
+        // Resets the net force to 0 and clears out force indices each draw loop
+        moleculeArray[i].clearNetForce();
         moleculeArray[i].clearForceIndices();
     }
 
@@ -208,6 +209,10 @@ class Particle {
             var magnitude = this.netForce.mag();
             this.body.applyForce(createVector(this.netForce.x / magnitude, this.netForce.y / magnitude), magnitude);
         }
+    }
+
+    clearNetForce() {
+        this.netForce = createVector(0,0);
     }
 
     // Returns whether the argument particle applied a force to this particle
