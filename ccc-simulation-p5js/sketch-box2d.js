@@ -3,6 +3,7 @@ var boundary;
 var piston;
 
 var systemKineticEnergy;
+var uniqueForcePairs;
 
 var imageDir = "img/svg/";
 
@@ -42,7 +43,7 @@ function setup() {
     // Creates molecule collection in a grid with random velocity vectors
     for (var i = 0; i < rowsOfParticles; i++) {
         for (var j = 0; j < 5; j++) {
-            moleculeArray[5 * i + j] = new Particle(161, createVector(width / 10 + (j * (width / 5)), height / 10 + i * (height / 10)), p5.Vector.random2D().mult(random(1, 5)), 5 * i + j);
+            moleculeArray[5 * i + j] = new Particle(161, createVector(width / 10 + (j * (width / 5)), height / 10 + i * (height / 10)), p5.Vector.random2D().mult(random(0, 1)), 5 * i + j);
         }
     }
 }
@@ -62,14 +63,18 @@ function draw() {
     // This is currently not working properly
     for (var i = 0; i < numberOfParticles; i++) {
         for (var j = 0; j < numberOfParticles; j++) {
-            if (moleculeArray[i].id == moleculeArray[j].id) {
-                continue;
-            } else if (moleculeArray[i].distanceToParticle(moleculeArray[j]) > (3.0 * moleculeArray[i].getRadius())) {
+            if (moleculeArray[i].id == moleculeArray[j].id || moleculeArray[i].indexedBy(moleculeArray[j])) {
                 continue;
             } else {
-                // var distanceVector = moleculeArray[i].vectorToParticle(moleculeArray[j]);
-                // var intermolecularForce = moleculeArray[i].calculateLJForce(distanceVector.mag(), 1.0, 1.0, 1.0);
-                // moleculeArray[i].addForce(distanceVector.mult(intermolecularForce));
+                moleculeArray[i].indexes(moleculeArray[j]);
+
+                // Apply the force from the vdW interactions (to be implemented)
+                var ljVector = moleculeArray[i].calculateLJForce(moleculeArray[j], 1e2);
+
+                // Newton's 3rd Law
+                moleculeArray[i].addForceToNetForce(ljVector);
+                moleculeArray[j].addForceToNetForce(ljVector.mult(-1));
+
             }
         }
     }
@@ -83,8 +88,11 @@ function draw() {
         systemKineticEnergy += moleculeArray[i].getKineticEnergy();
 
         // Applies intermolecular force calculations
-        moleculeArray[i].applyForce();
-        // console.log(moleculeArray[i].getNetForce());
+        moleculeArray[i].applyNetForce();
+        console.log(moleculeArray[i].getNetForce());
+
+        // Clears out force indices each draw loop
+        moleculeArray[i].clearForceIndices();
     }
 
     // Displays a readout of the system KE
@@ -139,6 +147,10 @@ class Particle {
         // Initializes the particle mass
         this.mass = 1;
 
+        // When forces are applied, we need to indicate which particle force pairs have already been calculated
+        // Avoids duplicate calculation of intermolecular forces
+        this.forceIndices = [];
+
         // Net force vector on the particle
         this.netForce = createVector(0, 0);
 
@@ -186,55 +198,58 @@ class Particle {
      */
 
     // Adds a vector of a force affecting a particle 
-    addForce(force) {
+    addForceToNetForce(force) {
         this.netForce.add(force);
     }
 
     // Applies a force onto a particle using the b2 library
-    applyForce() {
+    applyNetForce() {
         if (!(typeof this.body == 'undefined')) {
             var magnitude = this.netForce.mag();
             this.body.applyForce(createVector(this.netForce.x / magnitude, this.netForce.y / magnitude), magnitude);
         }
     }
 
+    // Returns whether the argument particle applied a force to this particle
+    indexedBy(particle) {
+        return this.forceIndices.includes(particle.id);
+    };
+
+    indexes(particle) {
+        this.forceIndices.push(particle.id);
+        particle.forceIndices.push(this.id);
+    }
+
+    clearForceIndices() {
+        this.forceIndices = [];
+    }
+
     // Calculates the van der Waals force on a particle using a Lennard-Jones potential
     // The Lennard-Jones potential is a mathematical simplification of the potential energy caused by van der Waals interactions
-    calculateLJForce(distance, a, b, scaleFactor) {
-        var distanceToParticle, A, B, scale, forceToReturn;
+    calculateLJForce(particle, epsilon) {
+        var epsilonValue, forceToReturn;
+        var distanceBetweenParticles = this.distanceToParticle(particle);
+        var vectorBetweenParticles = this.vectorToParticle(particle);
 
-        // Force cutoff may be necessary to prevent chaotic accelerations near collision radius
-        var forceCutoff = 3.0;
-
-        // Checks whether arguments were passed into the L-J function, if not they are set to a default value
-        if (typeof (a) == undefined && typeof (b) == undefined) {
-            A = 1.0;
-            B = 1.0;
+        // Sets the dept of the potential well
+        if (typeof epsilon == "undefined") {
+            epsilonValue = 1.0;
         } else {
-            A = a;
-            B = b;
+            epsilonValue = epsilon;
         }
 
-        // Sets a scale factor to increase or decrease force magnitude 
-        // this is purely so that the forces are on an appropriate scale relative to the particles
-        if (typeof (scaleFactor) == undefined) {
-            scale = 1.0;
+        // Determines whether the force should be applied
+        if (distanceBetweenParticles > 3.0 * this.getRadius()) {
+            forceToReturn = 0;
         } else {
-            scale = scaleFactor;
+            // Calculates the force per unit distance
+            // 24.0 * ((2.0 * 1/r^14) - 1/r^8) = 24.0 * ((2.0 * 1/r^13) - 1/r^7) * 1/r = F(r) * 1/r
+            var fOverR = 24.0 * epsilonValue * ((2.0 * Math.pow(distanceBetweenParticles, -14)) - Math.pow(distanceBetweenParticles, -8));
+            
+            forceToReturn = fOverR * distanceBetweenParticles;
         }
 
-        // Minimum distance threshhold (necessary?)
-        if (distance < 0.001) {
-            distanceToParticle = 0.001
-        } else {
-            distanceToParticle = distance / scale;
-        }
-
-        forceToReturn = (((12 * A) / Math.pow(distanceToParticle, 13)) - ((6 * B) / Math.pow(distanceToParticle, 7)));
-
-        // console.log(forceToReturn);
-
-        return Math.min(forceCutoff, forceToReturn);
+        return vectorBetweenParticles.normalize().mult(forceToReturn);
     }
 
     /**
@@ -246,9 +261,18 @@ class Particle {
         return (!(typeof this.body == 'undefined')) ? this.body.velocity : this.velocity;
     }
 
+    // Returns the angular velocity of a particle
+    getAngularVelocity() {
+        return (!(typeof this.body == 'undefined')) ? this.body.angularVelocity : 0;
+    }
+
     // Returns the position in pixels of the particle
     getPosition() {
         return (!(typeof this.body == 'undefined')) ? this.body.xy : this.position;
+    }
+
+    getMass() {
+        return (!(typeof this.body == 'undefined')) ? this.body.mass : this.mass;
     }
 
     // Returns the kinetic energy (rotational + translational) of the particle
@@ -258,12 +282,12 @@ class Particle {
 
     // Returns the translational kinetic energy of the particle
     getTranslationalKineticEnergy() {
-        return (!(typeof this.body == 'undefined')) ? (0.5 * this.body.mass * Math.pow(this.body.velocity.mag(), 2)) : 0;
+        return (0.5 * this.body.mass * Math.pow(this.getVelocity().mag(), 2));
     }
 
     // Returns the rotational kinetic energy of the particle
     getRotationalKineticEnergy() {
-        return (!(typeof this.body == 'undefined')) ? ((1 / 24) * this.body.mass * Math.pow(this.body.angularVelocity, 2) * (Math.pow(this.imageObject.width, 2) + Math.pow(this.imageObject.height, 2))) : 0;
+        return ((1 / 24) * this.getMass() * Math.pow(this.getAngularVelocity(), 2) * (Math.pow(this.imageObject.width, 2) + Math.pow(this.imageObject.height, 2)));
     }
 
     // Takes the maximum dimension of the molecule sprite as an approximate radial extent of the molecule
