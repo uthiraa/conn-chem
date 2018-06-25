@@ -43,7 +43,7 @@ function setup() {
     // Creates molecule collection in a grid with random velocity vectors
     for (var i = 0; i < rowsOfParticles; i++) {
         for (var j = 0; j < 5; j++) {
-            moleculeArray[5 * i + j] = new Particle(161, createVector(width / 10 + (j * (width / 5)), height / 10 + i * (height / 10)), p5.Vector.random2D().mult(random(0, 1)), 5 * i + j);
+            moleculeArray[5 * i + j] = new Particle(161, createVector(width / 10 + (j * (width / 5)), height / 10 + i * (height / 10)), p5.Vector.random2D().mult(random(1, 5)), 5 * i + j);
         }
     }
 }
@@ -69,11 +69,11 @@ function draw() {
                 moleculeArray[i].indexes(moleculeArray[j]);
 
                 // Apply the force from the vdW interactions (to be implemented)
-                var ljVector = moleculeArray[i].calculateLJForce(moleculeArray[j], 1e2);
+                var ljVector = moleculeArray[i].calculateLJForce(moleculeArray[j], 1e6);
 
                 // Newton's 3rd Law
                 moleculeArray[i].addForceToNetForce(ljVector);
-                moleculeArray[j].addForceToNetForce(ljVector.mult(-1));
+                moleculeArray[j].addForceToNetForce(ljVector);
 
             }
         }
@@ -89,10 +89,13 @@ function draw() {
 
         // Applies intermolecular force calculations
         moleculeArray[i].applyNetForce();
-        console.log(moleculeArray[i].getNetForce());
+        // console.log(moleculeArray[i].getNetForce());
+        // moleculeArray[i].showNetForce();
 
-        // Clears out force indices each draw loop
+        // Resets the net force to 0 and clears out force indices each draw loop
+        moleculeArray[i].clearNetForce();
         moleculeArray[i].clearForceIndices();
+        moleculeArray[i].clearNetForce();
     }
 
     // Displays a readout of the system KE
@@ -210,6 +213,10 @@ class Particle {
         }
     }
 
+    clearNetForce() {
+        this.netForce = createVector(0,0);
+    }
+
     // Returns whether the argument particle applied a force to this particle
     indexedBy(particle) {
         return this.forceIndices.includes(particle.id);
@@ -224,10 +231,15 @@ class Particle {
         this.forceIndices = [];
     }
 
+    clearNetForce() {
+        this.netForce.x = 0;
+        this.netForce.y = 0;
+    }
+
     // Calculates the van der Waals force on a particle using a Lennard-Jones potential
     // The Lennard-Jones potential is a mathematical simplification of the potential energy caused by van der Waals interactions
-    calculateLJForce(particle, epsilon) {
-        var epsilonValue, forceToReturn;
+    calculateLJForce(particle, epsilon, forceCutoff) {
+        var epsilonValue, forceCutoffValue, forceToReturn;
         var distanceBetweenParticles = this.distanceToParticle(particle);
         var vectorBetweenParticles = this.vectorToParticle(particle);
 
@@ -238,18 +250,25 @@ class Particle {
             epsilonValue = epsilon;
         }
 
+        // Sets the dept of the potential well
+        if (typeof forceCutoff == "undefined") {
+            forceCutoffValue = 1.0;
+        } else {
+            forceCutoffValue = forceCutoff;
+        }
+
         // Determines whether the force should be applied
-        if (distanceBetweenParticles > 3.0 * this.getRadius()) {
+        if (distanceBetweenParticles > 10.0 * this.getRadius()) {
             forceToReturn = 0;
         } else {
             // Calculates the force per unit distance
             // 24.0 * ((2.0 * 1/r^14) - 1/r^8) = 24.0 * ((2.0 * 1/r^13) - 1/r^7) * 1/r = F(r) * 1/r
             var fOverR = 24.0 * epsilonValue * ((2.0 * Math.pow(distanceBetweenParticles, -14)) - Math.pow(distanceBetweenParticles, -8));
             
-            forceToReturn = fOverR * distanceBetweenParticles;
+            forceToReturn = Math.min(fOverR * distanceBetweenParticles, forceCutoffValue);
         }
 
-        return vectorBetweenParticles.normalize().mult(forceToReturn);
+        return vectorBetweenParticles.normalize().mult(- forceToReturn);
     }
 
     /**
@@ -342,6 +361,10 @@ class Particle {
     showLabel() {
         // Displays a hovering bookeeping index for each particle
         text(this.id, this.position.x + 25, this.position.y + 25);
+    }
+
+    showNetForce() {
+            line(this.getPosition().x, this.getPosition().y, (this.getPosition().x + 3 * this.netForce.x), (this.getPosition().y + 3 * this.netForce.y));
     }
 
     /**
