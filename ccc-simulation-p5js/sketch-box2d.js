@@ -93,7 +93,6 @@ function draw() {
         // moleculeArray[i].showNetForce();
 
         // Resets the net force to 0 and clears out force indices each draw loop
-        moleculeArray[i].clearNetForce();
         moleculeArray[i].clearForceIndices();
         moleculeArray[i].clearNetForce();
     }
@@ -213,24 +212,23 @@ class Particle {
         }
     }
 
-    clearNetForce() {
-        this.netForce = createVector(0,0);
-    }
-
     // Returns whether the argument particle applied a force to this particle
     indexedBy(particle) {
         return this.forceIndices.includes(particle.id);
     };
 
+    // Adds the indices of this and the particle argument to the force index array for book keeping
     indexes(particle) {
         this.forceIndices.push(particle.id);
         particle.forceIndices.push(this.id);
     }
 
+    // Clears out the book keeping force pairs after each loop
     clearForceIndices() {
         this.forceIndices = [];
     }
 
+    // Sets the net force back to zero after each iteration
     clearNetForce() {
         this.netForce.x = 0;
         this.netForce.y = 0;
@@ -264,11 +262,11 @@ class Particle {
             // Calculates the force per unit distance
             // 24.0 * ((2.0 * 1/r^14) - 1/r^8) = 24.0 * ((2.0 * 1/r^13) - 1/r^7) * 1/r = F(r) * 1/r
             var fOverR = 24.0 * epsilonValue * ((2.0 * Math.pow(distanceBetweenParticles, -14)) - Math.pow(distanceBetweenParticles, -8));
-            
+
             forceToReturn = Math.min(fOverR * distanceBetweenParticles, forceCutoffValue);
         }
 
-        return vectorBetweenParticles.normalize().mult(- forceToReturn);
+        return vectorBetweenParticles.normalize().mult(-forceToReturn);
     }
 
     /**
@@ -290,6 +288,7 @@ class Particle {
         return (!(typeof this.body == 'undefined')) ? this.body.xy : this.position;
     }
 
+    // Returns the mass of the body
     getMass() {
         return (!(typeof this.body == 'undefined')) ? this.body.mass : this.mass;
     }
@@ -358,13 +357,16 @@ class Particle {
         line(this.position.x, this.position.y, (this.position.x + 3 * this.velocity.x), (this.position.y + 3 * this.velocity.y));
     }
 
+    // Displays a hovering bookeeping index for each particle
     showLabel() {
-        // Displays a hovering bookeeping index for each particle
         text(this.id, this.position.x + 25, this.position.y + 25);
     }
 
-    showNetForce() {
-            line(this.getPosition().x, this.getPosition().y, (this.getPosition().x + 3 * this.netForce.x), (this.getPosition().y + 3 * this.netForce.y));
+    // Shows a line representation of the net force vector
+    showNetForce(visualScale) {
+        var scale = (typeof visualScale == "undefined") ? 3 : visualScale;
+
+        line(this.getPosition().x, this.getPosition().y, (this.getPosition().x + scale * this.netForce.x), (this.getPosition().y + scale * this.netForce.y));
     }
 
     /**
