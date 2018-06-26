@@ -43,7 +43,7 @@ function setup() {
     // Creates molecule collection in a grid with random velocity vectors
     for (var i = 0; i < rowsOfParticles; i++) {
         for (var j = 0; j < 5; j++) {
-            moleculeArray[5 * i + j] = new Particle(161, createVector(width / 10 + (j * (width / 5)), height / 10 + i * (height / 10)), p5.Vector.random2D().mult(random(1, 5)), 5 * i + j);
+            moleculeArray[5 * i + j] = new Particle(161, createVector(width / 10 + (j * (width / 5)), height / 10 + i * (height / 10)), p5.Vector.random2D().mult(random(0, 1)), 5 * i + j);
         }
     }
 }
@@ -69,11 +69,11 @@ function draw() {
                 moleculeArray[i].indexes(moleculeArray[j]);
 
                 // Apply the force from the vdW interactions (to be implemented)
-                var ljVector = moleculeArray[i].calculateLJForce(moleculeArray[j], 1e6);
+                var ljVector = moleculeArray[i].calculateLJForce(moleculeArray[j], 1e2);
 
                 // Newton's 3rd Law
                 moleculeArray[i].addForceToNetForce(ljVector);
-                moleculeArray[j].addForceToNetForce(ljVector);
+                moleculeArray[j].addForceToNetForce(ljVector.mult(-1));
 
             }
         }
@@ -241,14 +241,14 @@ class Particle {
         var distanceBetweenParticles = this.distanceToParticle(particle);
         var vectorBetweenParticles = this.vectorToParticle(particle);
 
-        // Sets the dept of the potential well
+        // Sets the depth of the potential well
         if (typeof epsilon == "undefined") {
             epsilonValue = 1.0;
         } else {
             epsilonValue = epsilon;
         }
 
-        // Sets the dept of the potential well
+        // Sets a maximum force, attempt to prevent force blow-up at small delta r
         if (typeof forceCutoff == "undefined") {
             forceCutoffValue = 1.0;
         } else {
@@ -259,13 +259,16 @@ class Particle {
         if (distanceBetweenParticles > 10.0 * this.getRadius()) {
             forceToReturn = 0;
         } else {
-            // Calculates the force per unit distance
+            // Technique #1: Using absolute particle distance
             // 24.0 * ((2.0 * 1/r^14) - 1/r^8) = 24.0 * ((2.0 * 1/r^13) - 1/r^7) * 1/r = F(r) * 1/r
-            var fOverR = 24.0 * epsilonValue * ((2.0 * Math.pow(distanceBetweenParticles, -14)) - Math.pow(distanceBetweenParticles, -8));
+            // var fOverR = 24.0 * epsilonValue * ((2.0 * Math.pow(distanceBetweenParticles, -14)) - Math.pow(distanceBetweenParticles, -8));
 
-            forceToReturn = Math.min(fOverR * distanceBetweenParticles, forceCutoffValue);
+            // Technique #2: Using ratio of sprite radius (max of length, width) to particle distance
+            var fOverR = 12 * epsilonValue * (Math.pow((this.getRadius() / distanceBetweenParticles),13) - Math.pow((this.getRadius() / distanceBetweenParticles),7)) * Math.pow(distanceBetweenParticles, -1);
+
+            forceToReturn = Math.min(fOverR * distanceBetweenParticles, forceCutoffValue);            
         }
-
+        // Negative forces are attractive by definition, so we multiply by -1 to ensure the force vector has the same direction as r
         return vectorBetweenParticles.normalize().mult(-forceToReturn);
     }
 
