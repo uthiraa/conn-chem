@@ -241,14 +241,14 @@ class Particle {
         var distanceBetweenParticles = this.distanceToParticle(particle);
         var vectorBetweenParticles = this.vectorToParticle(particle);
 
-        // Sets the dept of the potential well
+        // Sets the depth of the potential well
         if (typeof epsilon == "undefined") {
             epsilonValue = 1.0;
         } else {
             epsilonValue = epsilon;
         }
 
-        // Sets the dept of the potential well
+        // Sets a maximum force, attempt to prevent force blow-up at small delta r
         if (typeof forceCutoff == "undefined") {
             forceCutoffValue = 1.0;
         } else {
