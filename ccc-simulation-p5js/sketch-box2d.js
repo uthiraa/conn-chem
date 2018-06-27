@@ -345,7 +345,7 @@ class Particle {
     drawParticle(imageObject) {
         // Creates b2 Body to interact with b2 world
         // This is called asychronously after the image is loaded
-        this.body = new b2Body('type', true, createVector(this.position.x, this.position.y), createVector(this.imageObject.width, this.imageObject.height), 1.0, 0, 1.0);
+        this.body = new b2Body('box', true, createVector(this.position.x, this.position.y), createVector(this.imageObject.width, this.imageObject.height), 1.0, 0, 1.0);
         this.body.image(imageObject, 0);
 
         // Set particle velocity
