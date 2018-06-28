@@ -1,13 +1,17 @@
+// Molecule variables
 var moleculeArray = [];
+var uniqueForcePairs;
+var numberOfParticles = 40;
+
+// Boundaries
 var boundary;
 var piston;
 
+// System variables
 var systemKineticEnergy;
-var uniqueForcePairs;
 
+// Global settings
 var imageDir = "img/svg/";
-
-var numberOfParticles = 20;
 
 function preload() {
 
@@ -23,8 +27,8 @@ function setup() {
     // Adjust framerate to slow animation, useful for debugging
     // frameRate(5);
 
-    // Initiates a new b2 world, scaling factor = 30, gravity vector
-    b2newWorld(30, createVector(0, 9.8));
+    // Initiates a new b2 world, scaling factor = 2, gravity vector
+    b2newWorld(3, createVector(0, 9.8));
 
     // Creates the boundary for a closed reaction container
     boundary = new Boundary("CLOSED");
@@ -43,7 +47,7 @@ function setup() {
     // Creates molecule collection in a grid with random velocity vectors
     for (var i = 0; i < rowsOfParticles; i++) {
         for (var j = 0; j < 5; j++) {
-            moleculeArray[5 * i + j] = new Particle(161, createVector(width / 10 + (j * (width / 5)), height / 10 + i * (height / 10)), p5.Vector.random2D().mult(random(0, 1)), 5 * i + j);
+            moleculeArray[5 * i + j] = new Particle(225, createVector(width / 10 + (j * (width / 5)), height / 10 + i * (height / 10)), p5.Vector.random2D().mult(random(1, 5)), 5 * i + j);
         }
     }
 }
@@ -68,12 +72,12 @@ function draw() {
             } else {
                 moleculeArray[i].indexes(moleculeArray[j]);
 
-                // Apply the force from the vdW interactions (to be implemented)
-                var ljVector = moleculeArray[i].calculateLJForce(moleculeArray[j], 1e2);
+                // Apply the force from the vdW interactions (using a gravitational potential function)
+                var imVector = moleculeArray[i].calculateIMForce(moleculeArray[j], 3e2);
 
                 // Newton's 3rd Law
-                moleculeArray[i].addForceToNetForce(ljVector);
-                moleculeArray[j].addForceToNetForce(ljVector.mult(-1));
+                moleculeArray[i].addForceToNetForce(imVector);
+                moleculeArray[j].addForceToNetForce(imVector.mult(-1));
 
             }
         }
@@ -272,6 +276,28 @@ class Particle {
         return vectorBetweenParticles.normalize().mult(-forceToReturn);
     }
 
+    // A simplified 1/r^2 force equation
+    calculateIMForce(particle, scaleFactor) {
+        var forcetoReturn, scaleFactorValue;
+        var distanceBetweenParticles = this.distanceToParticle(particle);
+        var vectorBetweenParticles = this.vectorToParticle(particle);
+
+        if (typeof scaleFactor == "undefined") {
+            scaleFactorValue = 1.0;
+        } else {
+            scaleFactorValue = scaleFactor;
+        }
+
+        // Imposes a efficiency constraint to limit the number of calculations per cycle
+        if (distanceBetweenParticles / (2 * this.getRadius()) > 3) {
+            forcetoReturn = 0
+        } else {
+            forcetoReturn = scaleFactorValue * Math.pow( distanceBetweenParticles / (2 * this.getRadius()), 2);
+        }
+
+        return vectorBetweenParticles.normalize().mult(forcetoReturn);
+    }
+
     /**
      * Get functions
      */
@@ -349,7 +375,7 @@ class Particle {
         this.body.image(imageObject, 0);
 
         // Set particle velocity
-        this.body.applyForce(createVector(this.velocity.x, this.velocity.y), 100);
+        this.body.applyForce(createVector(this.velocity.x, this.velocity.y), 1e4);
 
         // Sets position on the class variable
         this.setPosition(this.body.xy);
@@ -392,6 +418,20 @@ class Particle {
     }
 
 };
+
+// Collection of particles - used to create grids of particles
+class Collection {
+    constructor(key, position, separation, columns) {
+        // This is the value in the "ID" field of the database variable
+        this.databaseKey = key;
+        
+        // Sets the default position of the top left atom
+        this.position = position;
+
+        // Sets the default separation between particles in pixels
+        this.separation = separation;
+    }
+}
 
 // Array of Javascript objects containing names and file locations for different species
 var database = [
