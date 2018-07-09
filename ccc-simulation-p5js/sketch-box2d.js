@@ -154,16 +154,16 @@ class Particle {
         this.mass = 1;
 
         // When forces are applied, we need to indicate which particle force pairs have already been calculated
-        // Avoids duplicate calculation of intermolecular forces
+        // This avoids duplicate calculation of intermolecular forces
         this.forceIndices = [];
 
         // Net force vector on the particle
         this.netForce = createVector(0, 0);
 
-        // Sets the KE of the particle
+        // Sets the initial KE of the particle, we start at rest before applying an initial velocity, therefore KE = 0
         this.kineticEnergy = 0;
 
-        // Sets the image reference for using the ID number of the particle
+        // Sets the image reference for the molecule using the ID number of the particle
         this.imageUrl = imageDir + database[this.databaseKey - 1].file;
         this.imageObject = loadImage(this.imageUrl, (result) => {
 
@@ -268,9 +268,9 @@ class Particle {
             // var fOverR = 24.0 * epsilonValue * ((2.0 * Math.pow(distanceBetweenParticles, -14)) - Math.pow(distanceBetweenParticles, -8));
 
             // Technique #2: Using ratio of sprite radius (max of length, width) to particle distance
-            var fOverR = 12 * epsilonValue * (Math.pow((this.getRadius() / distanceBetweenParticles),13) - Math.pow((this.getRadius() / distanceBetweenParticles),7)) * Math.pow(distanceBetweenParticles, -1);
+            var fOverR = 12 * epsilonValue * (Math.pow((this.getRadius() / distanceBetweenParticles), 13) - Math.pow((this.getRadius() / distanceBetweenParticles), 7)) * Math.pow(distanceBetweenParticles, -1);
 
-            forceToReturn = Math.min(fOverR * distanceBetweenParticles, forceCutoffValue);            
+            forceToReturn = Math.min(fOverR * distanceBetweenParticles, forceCutoffValue);
         }
         // Negative forces are attractive by definition, so we multiply by -1 to ensure the force vector has the same direction as r
         return vectorBetweenParticles.normalize().mult(-forceToReturn);
@@ -289,10 +289,10 @@ class Particle {
         }
 
         // Imposes a efficiency constraint to limit the number of calculations per cycle
-        if (distanceBetweenParticles / (2 * this.getRadius()) > 3) {
+        if ((distanceBetweenParticles / this.getDiameter()) > 3) {
             forcetoReturn = 0
         } else {
-            forcetoReturn = scaleFactorValue * Math.pow( distanceBetweenParticles / (2 * this.getRadius()), 2);
+            forcetoReturn = scaleFactorValue * Math.pow((distanceBetweenParticles / this.getDiameter()), 2);
         }
 
         return vectorBetweenParticles.normalize().mult(forcetoReturn);
@@ -340,6 +340,10 @@ class Particle {
     // Takes the maximum dimension of the molecule sprite as an approximate radial extent of the molecule
     getRadius() {
         return (!(typeof this.body == 'undefined')) ? Math.max(this.body.wh(0).x / 2.0, this.body.wh(0).y / 2.0) : Math.max(this.imageObject.width / 2.0, this.imageObject.height / 2.0);
+    }
+
+    getDiameter() {
+        return (!(typeof this.body == 'undefined')) ? Math.max(this.body.wh(0).x, this.body.wh(0).y) : Math.max(this.imageObject.width, this.imageObject.height);
     }
 
     // Returns the net force vector (intermolecular forces)
@@ -424,7 +428,7 @@ class Collection {
     constructor(key, position, separation, columns) {
         // This is the value in the "ID" field of the database variable
         this.databaseKey = key;
-        
+
         // Sets the default position of the top left atom
         this.position = position;
 
