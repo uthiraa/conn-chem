@@ -1,0 +1,32 @@
+{
+    "name": {
+        "unit": 1,
+        "simulation": 1,
+        "fullName": "Unit 1: Simulation 1"
+    },
+    "global": {
+        "b2ScaleFactor": 3
+    },
+    "collections": {
+        "0": {
+            "key": 225,
+            "position": [200, 300],
+            "separation": 50,
+            "numberOfParticles": 40,
+            "columns": 10,
+            "options": {
+                "imForceConstant": 1e2
+            }
+        },
+        "1": {
+            "key": 164,
+            "position": [10, 10],
+            "separation": 100,
+            "numberOfParticles": 5,
+            "columns": 5,
+            "options": {
+                "imForceConstant": 0
+            }
+        }
+    }
+}
