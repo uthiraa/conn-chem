@@ -1,7 +1,6 @@
 // Molecule variables
 var moleculeArray = [];
-var uniqueForcePairs;
-var numberOfParticles = 40;
+var collectionArray = [];
 
 // Boundaries
 var boundary;
@@ -11,7 +10,15 @@ var piston;
 var systemKineticEnergy;
 
 // Global settings
+
+// Sets the relative directory to the folder containing particle sprites
 var imageDir = "img/svg/";
+
+// Scale factor used to scale distances and velocities in b2
+var b2ScaleFactor = 3;
+
+// Index to assign each particle a unique ID
+var particleIndex = 0;
 
 function preload() {
 
@@ -28,7 +35,7 @@ function setup() {
     // frameRate(5);
 
     // Initiates a new b2 world, scaling factor = 2, gravity vector
-    b2newWorld(3, createVector(0, 9.8));
+    b2newWorld(b2ScaleFactor, createVector(0, 9.8));
 
     // Creates the boundary for a closed reaction container
     boundary = new Boundary("CLOSED");
@@ -36,20 +43,10 @@ function setup() {
     // Creates the piston boundary for the reaction container
     piston = new Boundary("PISTON", createVector(width / 2, 0), createVector(width, 20))
 
-    // Calculates how many rows of particles to draw, currently assumes 5 columns of particles
-    var rowsOfParticles = Math.floor(numberOfParticles / 5)
+    // Creates a collection of particles
+    collectionArray[0] = new Collection(225, createVector(20, 50), 50, 40, 5);
+    collectionArray[1] = new Collection(164, createVector(10, height - 10), 100, 5, 5);
 
-    // Increments the number of rows if there isn't exactly a multiple of 5 particles
-    if (numberOfParticles % 5 > 0) {
-        rowsOfParticles++;
-    }
-
-    // Creates molecule collection in a grid with random velocity vectors
-    for (var i = 0; i < rowsOfParticles; i++) {
-        for (var j = 0; j < 5; j++) {
-            moleculeArray[5 * i + j] = new Particle(225, createVector(width / 10 + (j * (width / 5)), height / 10 + i * (height / 10)), p5.Vector.random2D().mult(random(1, 5)), 5 * i + j);
-        }
-    }
 }
 
 function draw() {
@@ -64,16 +61,15 @@ function draw() {
     b2Draw(false);
 
     // Calculate intermolecular forces and calculate net force vector
-    // This is currently not working properly
-    for (var i = 0; i < numberOfParticles; i++) {
-        for (var j = 0; j < numberOfParticles; j++) {
+    for (var i = 0; i < moleculeArray.length; i++) {
+        for (var j = 0; j < moleculeArray.length; j++) {
             if (moleculeArray[i].id == moleculeArray[j].id || moleculeArray[i].indexedBy(moleculeArray[j])) {
                 continue;
             } else {
                 moleculeArray[i].indexes(moleculeArray[j]);
 
                 // Apply the force from the vdW interactions (using a gravitational potential function)
-                var imVector = moleculeArray[i].calculateIMForce(moleculeArray[j], 3e2);
+                var imVector = moleculeArray[i].calculateIMForce(moleculeArray[j], 1e2);
 
                 // Newton's 3rd Law
                 moleculeArray[i].addForceToNetForce(imVector);
@@ -84,7 +80,7 @@ function draw() {
     }
 
     // Iterates over particles to update system KE & apply forces
-    for (var i = 0; i < numberOfParticles; i++) {
+    for (var i = 0; i < moleculeArray.length; i++) {
         // Calculates the KE of each particle
         moleculeArray[i].updateKineticEnergy();
 
@@ -103,6 +99,24 @@ function draw() {
 
     // Displays a readout of the system KE
     text(systemKineticEnergy, width / 2, height - 10);
+}
+
+// Removed the setup logic for the initial simulation of a default set of particles
+function defaultParticles(numberOfParticles) {
+    // Calculates how many rows of particles to draw, currently assumes 5 columns of particles
+    var rowsOfParticles = Math.floor(numberOfParticles / 5)
+
+    // Increments the number of rows if there isn't exactly a multiple of 5 particles
+    if (numberOfParticles % 5 > 0) {
+        rowsOfParticles++;
+    }
+
+    // Creates molecule collection in a grid with random velocity vectors
+    for (var i = 0; i < rowsOfParticles; i++) {
+        for (var j = 0; j < 5; j++) {
+            moleculeArray[5 * i + j] = new Particle(225, createVector(width / 10 + (j * (width / 5)), height / 10 + i * (height / 10)), p5.Vector.random2D().mult(random(1, 5)), 5 * i + j);
+        }
+    }
 }
 
 // Boundary class to create common boundary types
@@ -134,7 +148,7 @@ class Boundary {
 // Particle class to handle each particle and its properties
 class Particle {
 
-    constructor(key, position, velocity, id) {
+    constructor(key, position, velocity, id, options) {
         // This is the value in the "ID" field of the database variable
         this.databaseKey = key;
 
@@ -148,10 +162,10 @@ class Particle {
         this.position = createVector(position.x, position.y);
 
         // Sets the velocity of the particle
-        this.velocity = createVector(velocity.x, velocity.y)
+        this.velocity = createVector(velocity.x, velocity.y);
 
         // Initializes the particle mass
-        this.mass = 1;
+        this.mass = database[this.databaseKey - 1].mass || 1;
 
         // When forces are applied, we need to indicate which particle force pairs have already been calculated
         // This avoids duplicate calculation of intermolecular forces
@@ -290,7 +304,7 @@ class Particle {
 
         // Imposes a efficiency constraint to limit the number of calculations per cycle
         if ((distanceBetweenParticles / this.getDiameter()) > 3) {
-            forcetoReturn = 0
+            forcetoReturn = 0;
         } else {
             forcetoReturn = scaleFactorValue * Math.pow((distanceBetweenParticles / this.getDiameter()), 2);
         }
@@ -425,16 +439,50 @@ class Particle {
 
 // Collection of particles - used to create grids of particles
 class Collection {
-    constructor(key, position, separation, columns) {
+    constructor(key, position, separation, numberOfParticles, columns) {
         // This is the value in the "ID" field of the database variable
         this.databaseKey = key;
 
         // Sets the default position of the top left atom
-        this.position = position;
+        this.position = createVector(position.x, position.y);
 
         // Sets the default separation between particles in pixels
-        this.separation = separation;
+        this.separation = separation || 0;
+
+        // Sets how many particles are in this collection
+        this.numberOfParticles = numberOfParticles || 1;
+
+        // Defines how many columns the particles will be drawn in
+        this.columns = columns || 1;
+
+        // Begins the drawing of particles
+        this.initializeParticles();
     }
+
+    initializeParticles() {
+        // Calculates how many rows of particles to draw, currently assumes 5 columns of particles
+        var rowsOfParticles = Math.floor(this.numberOfParticles / this.columns);
+
+        // Increments the number of rows if there isn't exactly a multiple of 5 particles
+        if (this.numberOfParticles % this.columns > 0) {
+            rowsOfParticles++;
+        }
+
+        // Creates molecule collection in a grid with random velocity vectors
+        for (var i = 0; i < rowsOfParticles; i++) {
+            for (var j = 0; j < this.columns; j++) {
+                
+                // Adds the particle to the existing molecule array
+                // This is just a quick implementation - more robust would keep particles organized in collection
+                moleculeArray[particleIndex] = new Particle(this.databaseKey, createVector(this.position.x + (j * this.separation), this.position.y + i * this.separation), createVector(0,0), particleIndex);
+
+                // Increments the global particle index so that unique values are used
+                particleIndex++;
+            }
+        }
+    }
+
+
 }
 
 // Array of Javascript objects containing names and file locations for different species
