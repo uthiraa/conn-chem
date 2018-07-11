@@ -42,8 +42,8 @@ function setup() {
     // Adjust framerate to slow animation, useful for debugging
     // frameRate(5);
 
-    // Initiates a new b2 world, scaling factor = 2, gravity vector
-    b2newWorld(settings.global.b2ScaleFactor || 3, createVector(0, 9.8));
+    // Initiates a new b2 world, scaling factor, gravity vector
+    b2newWorld(settings.global.b2ScaleFactor || b2ScaleFactor, createVector(0, 9.8));
 
     // Creates the boundary for a closed reaction container
     boundary = new Boundary("CLOSED");
@@ -75,9 +75,12 @@ function draw() {
             if (moleculeArray[i].id == moleculeArray[j].id || moleculeArray[i].indexedBy(moleculeArray[j])) {
                 continue;
             } else {
+                // Stores that molecule_i and molecule_j are a known force pair
+                // Prevents duplicate calculation of IM forces per each draw loop
                 moleculeArray[i].indexes(moleculeArray[j]);
 
-                // Apply the force from the vdW interactions (using a gravitational potential function)
+                // Apply the force from the vdW interactions (using a Coulombic potential function)
+                // Currently the code assumes that when dissimilar particles interact, that the lesser of the two IM force constants should be used
                 var imVector = moleculeArray[i].calculateIMForce(moleculeArray[j], Math.min(moleculeArray[i].getIMForceConstant(), moleculeArray[j].getIMForceConstant()));
 
                 // Newton's 3rd Law
