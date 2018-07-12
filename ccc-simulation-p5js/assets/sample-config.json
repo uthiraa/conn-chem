@@ -15,7 +15,8 @@
             "numberOfParticles": 40,
             "columns": 10,
             "options": {
-                "imForceConstant": 1e2
+                "imForceConstant": 1e2,
+                "gravityScale": 1
             }
         },
         "1": {
@@ -25,7 +26,8 @@
             "numberOfParticles": 5,
             "columns": 5,
             "options": {
-                "imForceConstant": 0
+                "imForceConstant": 1e2,
+                "gravityScale": 0.2
             }
         }
     }

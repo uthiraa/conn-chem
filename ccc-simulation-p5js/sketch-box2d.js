@@ -179,6 +179,9 @@ class Particle {
         // Defines the intermolecular force scale constant
         this.imForceConstant = options.imForceConstant || defaultIMForceConstant;
 
+        // Gravity scalar
+        this.gravityScale = options.gravityScale || 1;
+
         // Initializes the particle mass
         this.mass = database[this.databaseKey - 1].mass || 1;
 
@@ -411,6 +414,9 @@ class Particle {
         // This is called asychronously after the image is loaded
         this.body = new b2Body('box', true, createVector(this.position.x, this.position.y), createVector(this.imageObject.width, this.imageObject.height), 1.0, 0, 1.0);
         this.body.image(imageObject, 0);
+
+        // Sets the gravity scalar per particle
+        this.body.gravityScale = this.gravityScale;
 
         // Set particle velocity
         this.body.applyForce(createVector(this.velocity.x, this.velocity.y), 1e4);
