@@ -53,7 +53,9 @@ function setup() {
 
     // Creates a collection of particles from settings file
     for (var i = 0; i < Object.keys(settings.collections).length; i++) {
-        collectionArray[i] = new Collection(settings.collections[i].key, createVector(settings.collections[i].position[0], settings.collections[i].position[1]), settings.collections[i].separation, settings.collections[i].numberOfParticles, settings.collections[i].columns, settings.collections[i].options);
+        //constructor(key, position, numberOfParticles, collectionOptions, particleOptions)
+        // collectionArray[i] = new Collection(settings.collections[i].key, createVector(settings.collections[i].position[0], settings.collections[i].position[1]), settings.collections[i].separation, settings.collections[i].numberOfParticles, settings.collections[i].columns, settings.collections[i].options);
+        collectionArray[i] = new Collection(settings.collections[i].key, createVector(settings.collections[i].position[0], settings.collections[i].position[1]), settings.collections[i].numberOfParticles, settings.collections[i].collectionOptions, settings.collections[i].particleOptions);
     }
 
 }
@@ -172,8 +174,11 @@ class Particle {
         // Gravity scalar
         this.gravityScale = options.gravityScale || 1;
 
-        // Body Type
+        // Body type
         this.bodyType = options.bodyType || "box";
+
+        // Body categories
+        this.collisionCategory = options.collisionCategory || 1;
 
         // Initializes the particle mass
         this.mass = database[this.databaseKey - 1].mass || 1;
@@ -341,6 +346,11 @@ class Particle {
         return (!(typeof this.body == 'undefined')) ? this.body.mass : this.mass;
     }
 
+    // Returns the database key for a particle
+    getKey() {
+        return this.databaseKey;
+    }
+
     // Returns the kinetic energy (rotational + translational) of the particle
     getKineticEnergy() {
         return this.kineticEnergy;
@@ -356,13 +366,24 @@ class Particle {
         return ((1 / 24) * this.getMass() * Math.pow(this.getAngularVelocity(), 2) * (Math.pow(this.imageObject.width, 2) + Math.pow(this.imageObject.height, 2)));
     }
 
-    // Takes the maximum dimension of the molecule sprite as an approximate radial extent of the molecule
+    // Returns half the maximum dimension of the sprite as an approximate radial extent of the particle
     getRadius() {
         return (!(typeof this.body == 'undefined')) ? Math.max(this.body.wh(0).x / 2.0, this.body.wh(0).y / 2.0) : Math.max(this.imageObject.width / 2.0, this.imageObject.height / 2.0);
     }
 
+    // Returns the maximum dimension of a sprite sprite as an approximate diameter of the particle
     getDiameter() {
         return (!(typeof this.body == 'undefined')) ? Math.max(this.body.wh(0).x, this.body.wh(0).y) : Math.max(this.imageObject.width, this.imageObject.height);
+    }
+
+    // Returns the height of a particle
+    getHeight() {
+        return (!(typeof this.body == 'undefined')) ? this.body.wh(0).y : this.imageObject.height;
+    }
+
+    // Returns the width of a particle
+    getWidth() {
+        return (!(typeof this.body == 'undefined')) ? this.body.wh(0).x : this.imageObject.width;
     }
 
     // Returns the net force vector (intermolecular forces)
@@ -404,6 +425,10 @@ class Particle {
 
         // Sets the gravity scalar per particle
         this.body.gravityScale = this.gravityScale;
+
+        // Sets the collision category for the particle using b2's 2^n notation, where n is the category index
+        // Max category index is n = 15
+        this.categories = Math.pow(2, this.collisionCategory);
 
         // Set particle velocity
         this.body.applyForce(createVector(this.velocity.x, this.velocity.y), 1e4);
@@ -447,52 +472,103 @@ class Particle {
 
 // Collection of particles - used to create grids of particles
 class Collection {
-    constructor(key, position, separation, numberOfParticles, columns, options) {
+    // constructor(key, position, separation, numberOfParticles, columns, options) {
+    //     // This is the value in the "ID" field of the database variable
+    //     this.databaseKey = key;
+
+    //     // Sets the default position of the top left atom
+    //     this.position = createVector(position.x, position.y);
+
+    //     // Sets the default separation between particles in pixels
+    //     this.separation = separation || 0;
+
+    //     // Sets how many particles are in this collection
+    //     this.numberOfParticles = numberOfParticles || 1;
+
+    //     // Defines how many columns the particles will be drawn in
+    //     this.columns = columns || 1;
+
+    //     // Sets the force constant for the particles
+    //     this.options = options;
+
+    //     // Begins the drawing of particles
+    //     this.initializeParticles();
+    // }
+
+    constructor(key, position, numberOfParticles, collectionOptions, particleOptions) {
         // This is the value in the "ID" field of the database variable
         this.databaseKey = key;
 
-        // Sets the default position of the top left atom
+        // Sets the default position of the first atom
         this.position = createVector(position.x, position.y);
 
-        // Sets the default separation between particles in pixels
-        this.separation = separation || 0;
+        // Sets the default height of particles in pixels
+        this.particleWidth = 0;
+        this.particleHeight = 0;
+
+        // Defines how many columns the particles will be drawn in
+        this.collectionOptions = collectionOptions || { "crystalStructure": "grid" };
+
+        // Sets the default separation between particles in the lattice
+        this.separation = this.collectionOptions.separation || 0;
 
         // Sets how many particles are in this collection
         this.numberOfParticles = numberOfParticles || 1;
 
-        // Defines how many columns the particles will be drawn in
-        this.columns = columns || 1;
-
         // Sets the force constant for the particles
-        this.options = options;
+        this.particleOptions = particleOptions || {};
 
         // Begins the drawing of particles
         this.initializeParticles();
     }
 
+    // Begins the configuration of the crystal lattice
     initializeParticles() {
 
+        switch (this.collectionOptions.crystalStructure) {
+            case "pyramid":
+                console.log("pyramid option");
+                break;
+
+            default:
+                this.drawGrid();
+                break;
+        }
+    }
+
+    // Draw particle configuration that is a standard rectangular grid
+    drawGrid() {
+        var columns = this.collectionOptions.columns || 5;
 
         // Calculates how many rows of particles to draw, currently assumes 5 columns of particles
-        var rowsOfParticles = Math.floor(this.numberOfParticles / this.columns);
+        var rowsOfParticles = Math.floor(this.numberOfParticles / columns);
 
-        // Increments the number of rows if there isn't exactly a multiple of this.columns
-        if (this.numberOfParticles % this.columns > 0) {
+        // Increments the number of rows if there isn't exactly a multiple of columns
+        if (this.numberOfParticles % columns > 0) {
             rowsOfParticles++;
         }
 
         // Creates molecule collection in a grid with random velocity vectors
         for (var i = 0; i < rowsOfParticles; i++) {
-            for (var j = 0; j < this.columns; j++) {
+            for (var j = 0; j < columns; j++) {
 
                 // This stops the for loop if we've reached the last particle
-                if ((i * this.columns + j + 1) > this.numberOfParticles) {
+                if ((i * columns + j + 1) > this.numberOfParticles) {
                     break;
                 } else {
 
                     // Adds the particle to the existing molecule array
                     // This is just a quick implementation - more robust would keep particles organized in collection
-                    moleculeArray[particleIndex] = new Particle(this.databaseKey, createVector(this.position.x + (j * this.separation), this.position.y + i * this.separation), createVector(0, 0), particleIndex, this.options);
+                    moleculeArray[particleIndex] = new Particle(this.databaseKey, createVector(this.position.x + (j * (this.particleWidth + this.separation)), this.position.y + i * (this.particleHeight + this.separation)), createVector(0, 0), particleIndex, this.particleOptions);
+
+                    // Initialize the properties of the particle for proper lattice spacing
+                    if ((i * columns + j + 1) == 1) {
+                        this.setParticleHeight(moleculeArray[particleIndex].getHeight());
+                        this.setParticleWidth(moleculeArray[particleIndex].getWidth());
+
+                        console.log(this.getParticleHeight());
+                        console.log(this.getParticleWidth());
+                    }
 
                     // Increments the global particle index so that unique values are used
                     particleIndex++;
@@ -501,6 +577,39 @@ class Collection {
             }
         }
     }
+
+    // Code draws a pyramid lattice
+    drawPyramid() {
+        // to be implemented
+    }
+
+    /**
+     * Set functions
+     */
+
+    // Sets the particle width
+    setParticleWidth(width) {
+        this.particleWidth = width;
+    }
+
+    // Sets the particle height
+    setParticleHeight(height) {
+        this.particleHeight = height;
+    }
+
+    /**
+     * Get functions
+     */
+
+    // Gets the particle width
+     getParticleWidth() {
+        return this.particleWidth;
+     }
+
+    // Gets the particle width
+     getParticleHeight() {
+        return this.particleHeight;
+     }
 
 
 }

@@ -11,10 +11,13 @@
         "0": {
             "key": 225,
             "position": [200, 300],
-            "separation": 50,
             "numberOfParticles": 40,
-            "columns": 10,
-            "options": {
+            "collectionOptions": {
+                "crystalStructure" : "grid",
+                "columns": 10,
+                "separation": 50
+            },
+            "particleOptions": {
                 "bodyType": "box",
                 "imForceConstant": 1e2,
                 "gravityScale": 1,
@@ -24,10 +27,13 @@
         "1": {
             "key": 164,
             "position": [100, 10],
-            "separation": 100,
             "numberOfParticles": 5,
-            "columns": 5,
-            "options": {
+            "collectionOptions": {
+                "crystalStructure" : "grid",
+                "separation": 100,
+                "columns": 5
+            },
+            "particleOptions": {
                 "bodyType": "box",
                 "imForceConstant": 1,
                 "gravityScale": 0.4,
@@ -42,7 +48,7 @@
             "backwardProbability": 0
         },
         "reactants": {
-            
+
         },
         "products": {
 
