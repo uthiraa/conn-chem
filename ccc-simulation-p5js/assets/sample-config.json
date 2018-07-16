@@ -15,20 +15,37 @@
             "numberOfParticles": 40,
             "columns": 10,
             "options": {
+                "bodyType": "box",
                 "imForceConstant": 1e2,
-                "gravityScale": 1
+                "gravityScale": 1,
+                "collisionCategory": 1
             }
         },
         "1": {
             "key": 164,
-            "position": [10, 10],
+            "position": [100, 10],
             "separation": 100,
             "numberOfParticles": 5,
             "columns": 5,
             "options": {
-                "imForceConstant": 1e2,
-                "gravityScale": 0.2
+                "bodyType": "box",
+                "imForceConstant": 1,
+                "gravityScale": 0.4,
+                "collisionCategory": 2
             }
+        }
+    },
+    "reaction": {
+        "properties": {
+            "reversible": false,
+            "forwardProbability": 0.5,
+            "backwardProbability": 0
+        },
+        "reactants": {
+            
+        },
+        "products": {
+
         }
     }
 }

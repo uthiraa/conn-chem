@@ -22,7 +22,7 @@ var b2ScaleFactor = 3;
 var particleIndex = 0;
 
 // Default force constant for intermolecular interactions
-var defaultIMForceConstant = 1e2;
+var defaultIMForceConstant = 0;
 
 function preload() {
     // Database is read in from an external JSON
@@ -70,6 +70,16 @@ function draw() {
     b2Draw(false);
 
     // Calculate intermolecular forces and calculate net force vector
+    calculateIMForces();
+
+    // Iterates over particles to update system KE & apply forces
+    updateSystem();
+
+    // Displays a readout of the system KE
+    text(systemKineticEnergy, width / 2, height - 10);
+}
+
+function calculateIMForces() {
     for (var i = 0; i < moleculeArray.length; i++) {
         for (var j = 0; j < moleculeArray.length; j++) {
             if (moleculeArray[i].id == moleculeArray[j].id || moleculeArray[i].indexedBy(moleculeArray[j])) {
@@ -90,8 +100,9 @@ function draw() {
             }
         }
     }
+}
 
-    // Iterates over particles to update system KE & apply forces
+function updateSystem() {
     for (var i = 0; i < moleculeArray.length; i++) {
         // Calculates the KE of each particle
         moleculeArray[i].updateKineticEnergy();
@@ -102,32 +113,11 @@ function draw() {
         // Applies intermolecular force calculations
         moleculeArray[i].applyNetForce();
         // console.log(moleculeArray[i].getNetForce());
-        // moleculeArray[i].showNetForce();
+        // moleculeArray[i].showNetForce(1);
 
         // Resets the net force to 0 and clears out force indices each draw loop
         moleculeArray[i].clearForceIndices();
         moleculeArray[i].clearNetForce();
-    }
-
-    // Displays a readout of the system KE
-    text(systemKineticEnergy, width / 2, height - 10);
-}
-
-// Removed the setup logic for the initial simulation of a default set of particles
-function defaultParticles(numberOfParticles) {
-    // Calculates how many rows of particles to draw, currently assumes 5 columns of particles
-    var rowsOfParticles = Math.floor(numberOfParticles / 5)
-
-    // Increments the number of rows if there isn't exactly a multiple of 5 particles
-    if (numberOfParticles % 5 > 0) {
-        rowsOfParticles++;
-    }
-
-    // Creates molecule collection in a grid with random velocity vectors
-    for (var i = 0; i < rowsOfParticles; i++) {
-        for (var j = 0; j < 5; j++) {
-            moleculeArray[5 * i + j] = new Particle(225, createVector(width / 10 + (j * (width / 5)), height / 10 + i * (height / 10)), p5.Vector.random2D().mult(random(1, 5)), 5 * i + j);
-        }
     }
 }
 
@@ -181,6 +171,9 @@ class Particle {
 
         // Gravity scalar
         this.gravityScale = options.gravityScale || 1;
+
+        // Body Type
+        this.bodyType = options.bodyType || "box";
 
         // Initializes the particle mass
         this.mass = database[this.databaseKey - 1].mass || 1;
@@ -310,15 +303,9 @@ class Particle {
 
     // A simplified 1/r^2 force equation
     calculateIMForce(particle, scaleFactor) {
-        var forcetoReturn, scaleFactorValue;
+        var forcetoReturn, scaleFactorValue = scaleFactor || 1.0;
         var distanceBetweenParticles = this.distanceToParticle(particle);
         var vectorBetweenParticles = this.vectorToParticle(particle);
-
-        if (typeof scaleFactor == "undefined") {
-            scaleFactorValue = 1.0;
-        } else {
-            scaleFactorValue = scaleFactor;
-        }
 
         // Imposes a efficiency constraint to limit the number of calculations per cycle
         if ((distanceBetweenParticles / this.getDiameter()) > 3) {
@@ -412,7 +399,7 @@ class Particle {
     drawParticle(imageObject) {
         // Creates b2 Body to interact with b2 world
         // This is called asychronously after the image is loaded
-        this.body = new b2Body('box', true, createVector(this.position.x, this.position.y), createVector(this.imageObject.width, this.imageObject.height), 1.0, 0, 1.0);
+        this.body = new b2Body(this.bodyType, true, createVector(this.position.x, this.position.y), createVector(this.imageObject.width, this.imageObject.height), 1.0, 0, 1.0);
         this.body.image(imageObject, 0);
 
         // Sets the gravity scalar per particle
@@ -448,12 +435,7 @@ class Particle {
 
     // Writes particle ID, position, and velocity to the console
     log() {
-        // console.log(this.id + "\t" + this.getPosition().x + "\t" + this.getPosition().y + "\t" + this.getVelocity().x + "\t" + this.getVelocity().y);
-        if (typeof (this.body) == "undefined") {
-            // Do nothing - this is necessary to wait until the object is created
-        } else {
-            console.log(this.body.velocity);
-        }
+        (typeof this.body == "undefined") ? console.log("body undefined") : console.log(this.id + "\t" + this.getPosition().x + "\t" + this.getPosition().y + "\t" + this.getVelocity().x + "\t" + this.getVelocity().y);
     }
 
     // Provides a string representation of the Particle object
@@ -489,10 +471,12 @@ class Collection {
     }
 
     initializeParticles() {
+
+
         // Calculates how many rows of particles to draw, currently assumes 5 columns of particles
         var rowsOfParticles = Math.floor(this.numberOfParticles / this.columns);
 
-        // Increments the number of rows if there isn't exactly a multiple of 5 particles
+        // Increments the number of rows if there isn't exactly a multiple of this.columns
         if (this.numberOfParticles % this.columns > 0) {
             rowsOfParticles++;
         }
@@ -500,13 +484,20 @@ class Collection {
         // Creates molecule collection in a grid with random velocity vectors
         for (var i = 0; i < rowsOfParticles; i++) {
             for (var j = 0; j < this.columns; j++) {
-                
-                // Adds the particle to the existing molecule array
-                // This is just a quick implementation - more robust would keep particles organized in collection
-                moleculeArray[particleIndex] = new Particle(this.databaseKey, createVector(this.position.x + (j * this.separation), this.position.y + i * this.separation), createVector(0,0), particleIndex, this.options);
 
-                // Increments the global particle index so that unique values are used
-                particleIndex++;
+                // This stops the for loop if we've reached the last particle
+                if ((i * this.columns + j + 1) > this.numberOfParticles) {
+                    break;
+                } else {
+
+                    // Adds the particle to the existing molecule array
+                    // This is just a quick implementation - more robust would keep particles organized in collection
+                    moleculeArray[particleIndex] = new Particle(this.databaseKey, createVector(this.position.x + (j * this.separation), this.position.y + i * this.separation), createVector(0, 0), particleIndex, this.options);
+
+                    // Increments the global particle index so that unique values are used
+                    particleIndex++;
+                }
+
             }
         }
     }
