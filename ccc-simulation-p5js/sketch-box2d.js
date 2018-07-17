@@ -378,12 +378,12 @@ class Particle {
 
     // Returns the height of a particle
     getHeight() {
-        return (!(typeof this.body == 'undefined')) ? this.body.wh(0).y : this.imageObject.height;
+        return this.imageObject.height;
     }
 
     // Returns the width of a particle
     getWidth() {
-        return (!(typeof this.body == 'undefined')) ? this.body.wh(0).x : this.imageObject.width;
+        return this.imageObject.width;
     }
 
     // Returns the net force vector (intermolecular forces)
@@ -518,8 +518,17 @@ class Collection {
         // Sets the force constant for the particles
         this.particleOptions = particleOptions || {};
 
-        // Begins the drawing of particles
-        this.initializeParticles();
+        // Sets the image reference for the molecule using the ID number of the particle
+        this.imageUrl = imageDir + database[this.databaseKey - 1].file;
+        this.imageObject = loadImage(this.imageUrl, (result) => {
+
+            this.setParticleHeight(result.height);
+            this.setParticleWidth(result.width);
+
+            // Begins the drawing of particles
+            this.initializeParticles();
+
+        });
     }
 
     // Begins the configuration of the crystal lattice
@@ -560,15 +569,6 @@ class Collection {
                     // Adds the particle to the existing molecule array
                     // This is just a quick implementation - more robust would keep particles organized in collection
                     moleculeArray[particleIndex] = new Particle(this.databaseKey, createVector(this.position.x + (j * (this.particleWidth + this.separation)), this.position.y + i * (this.particleHeight + this.separation)), createVector(0, 0), particleIndex, this.particleOptions);
-
-                    // Initialize the properties of the particle for proper lattice spacing
-                    if ((i * columns + j + 1) == 1) {
-                        this.setParticleHeight(moleculeArray[particleIndex].getHeight());
-                        this.setParticleWidth(moleculeArray[particleIndex].getWidth());
-
-                        console.log(this.getParticleHeight());
-                        console.log(this.getParticleWidth());
-                    }
 
                     // Increments the global particle index so that unique values are used
                     particleIndex++;

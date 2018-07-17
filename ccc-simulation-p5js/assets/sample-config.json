@@ -15,7 +15,7 @@
             "collectionOptions": {
                 "crystalStructure" : "grid",
                 "columns": 10,
-                "separation": 50
+                "separation": 0
             },
             "particleOptions": {
                 "bodyType": "box",
@@ -30,7 +30,7 @@
             "numberOfParticles": 5,
             "collectionOptions": {
                 "crystalStructure" : "grid",
-                "separation": 100,
+                "separation": 0,
                 "columns": 5
             },
             "particleOptions": {
