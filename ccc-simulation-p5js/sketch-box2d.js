@@ -472,28 +472,6 @@ class Particle {
 
 // Collection of particles - used to create grids of particles
 class Collection {
-    // constructor(key, position, separation, numberOfParticles, columns, options) {
-    //     // This is the value in the "ID" field of the database variable
-    //     this.databaseKey = key;
-
-    //     // Sets the default position of the top left atom
-    //     this.position = createVector(position.x, position.y);
-
-    //     // Sets the default separation between particles in pixels
-    //     this.separation = separation || 0;
-
-    //     // Sets how many particles are in this collection
-    //     this.numberOfParticles = numberOfParticles || 1;
-
-    //     // Defines how many columns the particles will be drawn in
-    //     this.columns = columns || 1;
-
-    //     // Sets the force constant for the particles
-    //     this.options = options;
-
-    //     // Begins the drawing of particles
-    //     this.initializeParticles();
-    // }
 
     constructor(key, position, numberOfParticles, collectionOptions, particleOptions) {
         // This is the value in the "ID" field of the database variable
@@ -536,7 +514,7 @@ class Collection {
 
         switch (this.collectionOptions.crystalStructure) {
             case "pyramid":
-                console.log("pyramid option");
+                this.drawPyramid();
                 break;
 
             default:
@@ -580,7 +558,28 @@ class Collection {
 
     // Code draws a pyramid lattice
     drawPyramid() {
-        // to be implemented
+        // The number of rows is calculated using n(n+1)/2 = # of particles
+        var rowsOfParticles = Math.ceil((-1 + Math.pow(1 + 8 * (this.numberOfParticles), 0.5)) / 2);
+
+        // Draws the particles in a pyramidal structure
+        for (var i = 0; i < rowsOfParticles; i++) {
+            for (var j = 0; j < i + 1; j++) {
+
+                // This stops the for loop if we've reached the last particle
+                if (((i) * (i + 1)) / 2 + j + 1 > this.numberOfParticles) {
+                    break;
+                } else {
+
+                    // Adds the particle to the existing molecule array
+                    // This is just a quick implementation - more robust would keep particles organized in collection
+                    moleculeArray[particleIndex] = new Particle(this.databaseKey, createVector(this.position.x + ((j - (i / 2)) * (this.particleWidth + this.separation)), this.position.y + i * (this.particleHeight + this.separation)), createVector(0, 0), particleIndex, this.particleOptions);
+
+                    // Increments the global particle index so that unique values are used
+                    particleIndex++;
+                }
+
+            }
+        }
     }
 
     /**
@@ -602,14 +601,14 @@ class Collection {
      */
 
     // Gets the particle width
-     getParticleWidth() {
+    getParticleWidth() {
         return this.particleWidth;
-     }
+    }
 
     // Gets the particle width
-     getParticleHeight() {
+    getParticleHeight() {
         return this.particleHeight;
-     }
+    }
 
 
 }

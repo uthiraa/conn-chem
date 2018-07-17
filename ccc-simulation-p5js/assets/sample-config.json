@@ -20,23 +20,23 @@
             "particleOptions": {
                 "bodyType": "box",
                 "imForceConstant": 1e2,
-                "gravityScale": 1,
+                "gravityScale": 0.8,
                 "collisionCategory": 1
             }
         },
         "1": {
-            "key": 164,
-            "position": [100, 10],
-            "numberOfParticles": 5,
+            "key": 187,
+            "position": [300, 50],
+            "numberOfParticles": 9,
             "collectionOptions": {
-                "crystalStructure" : "grid",
+                "crystalStructure" : "pyramid",
                 "separation": 0,
                 "columns": 5
             },
             "particleOptions": {
                 "bodyType": "box",
-                "imForceConstant": 1,
-                "gravityScale": 0.4,
+                "imForceConstant": 1e3,
+                "gravityScale": 1.0,
                 "collisionCategory": 2
             }
         }
