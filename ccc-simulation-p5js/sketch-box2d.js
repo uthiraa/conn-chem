@@ -312,7 +312,7 @@ class Particle {
         var distanceBetweenParticles = this.distanceToParticle(particle);
         var vectorBetweenParticles = this.vectorToParticle(particle);
 
-        // Imposes a efficiency constraint to limit the number of calculations per cycle
+        // Imposes an efficiency constraint to limit the number of calculations per cycle
         if ((distanceBetweenParticles / this.getDiameter()) > 3) {
             forcetoReturn = 0;
         } else {
@@ -496,6 +496,12 @@ class Collection {
         // Sets the force constant for the particles
         this.particleOptions = particleOptions || {};
 
+        // Map of particles and crystal indices
+        this.particleMap = {};
+
+        // Joints in the crystal lattice
+        this.jointArray = [];
+
         // Sets the image reference for the molecule using the ID number of the particle
         this.imageUrl = imageDir + database[this.databaseKey - 1].file;
         this.imageObject = loadImage(this.imageUrl, (result) => {
@@ -515,6 +521,7 @@ class Collection {
         switch (this.collectionOptions.crystalStructure) {
             case "pyramid":
                 this.drawPyramid();
+                this.linkPyramidLattice();
                 break;
 
             default:
@@ -563,6 +570,10 @@ class Collection {
 
         // Draws the particles in a pyramidal structure
         for (var i = 0; i < rowsOfParticles; i++) {
+
+            // To store the i,j index pair, we have to construct the j-indexed object in the second loop
+            var tempObject = {};
+
             for (var j = 0; j < i + 1; j++) {
 
                 // This stops the for loop if we've reached the last particle
@@ -574,10 +585,57 @@ class Collection {
                     // This is just a quick implementation - more robust would keep particles organized in collection
                     moleculeArray[particleIndex] = new Particle(this.databaseKey, createVector(this.position.x + ((j - (i / 2)) * (this.particleWidth + this.separation)), this.position.y + i * (this.particleHeight + this.separation)), createVector(0, 0), particleIndex, this.particleOptions);
 
+                    // The j-indexed objects and their associated Particle are added to the tempObject which will be nested in the i-th index
+                    tempObject = Object.assign({
+                        [j]: moleculeArray[particleIndex]
+                    }, tempObject);
+
                     // Increments the global particle index so that unique values are used
                     particleIndex++;
                 }
 
+            }
+
+            // Assigns the j-indexed object to the i-th index in the particle map
+            this.particleMap = Object.assign({
+                [i]: tempObject
+            }, this.particleMap);
+        }
+    }
+
+    // Attempts to link together formula units in crystal, currently is not working because of async issues
+    linkPyramidLattice() {
+        var jointIndex = 0;
+
+        for (var i = 0; i < Object.keys(this.particleMap).length; i++) {
+            for (var j = 0; j < Object.keys(this.particleMap[i]).length; j++) {
+
+                //The j-th index equaling the i-th index means you've reached the last particle in a row
+                if (i == j) {
+                    // End of row means no joint is created with particle to the right
+                    this.jointArray[jointIndex] = new b2Joint("rope", this.particleMap[i][j], this.particleMap[i + 1][j], {separation: this.particleMap[i][j].distanceToParticle(this.particleMap[i + 1][j]) });
+                    jointIndex++;
+
+                    this.jointArray[jointIndex] = new b2Joint("rope", this.particleMap[i][j], this.particleMap[i + 1][j + 1], {separation: this.particleMap[i][j].distanceToParticle(this.particleMap[i + 1][j + 1])});
+                    jointIndex++;
+                } else if (i == Object.keys(this.particleMap).length - 1) {
+                    // If we're in the last row of particles, there's no need to connect to the lower row
+
+                    // Connects to particle to its right and the two below
+                    this.jointArray[jointIndex] = new b2Joint("rope", this.particleMap[i][j], this.particleMap[i][j + 1], {separation: this.particleMap[i][j].distanceToParticle(this.particleMap[i][j + 1])});
+                    jointIndex++;
+
+                } else {
+                    // Connects to particle to its right and the two below
+                    this.jointArray[jointIndex] = new b2Joint("rope", this.particleMap[i][j], this.particleMap[i][j + 1], {separation: this.particleMap[i][j].distanceToParticle(this.particleMap[i][j + 1])});
+                    jointIndex++;
+
+                    this.jointArray[jointIndex] = new b2Joint("rope", this.particleMap[i][j], this.particleMap[i + 1][j], {separation: this.particleMap[i][j].distanceToParticle(this.particleMap[i + 1][j])});
+                    jointIndex++;
+
+                    this.jointArray[jointIndex] = new b2Joint("rope", this.particleMap[i][j], this.particleMap[i + 1][j + 1], {separation: this.particleMap[i][j].distanceToParticle(this.particleMap[i + 1][j + 1])});
+                    jointIndex++;
+                }
             }
         }
     }

@@ -27,7 +27,7 @@
         "1": {
             "key": 187,
             "position": [300, 50],
-            "numberOfParticles": 9,
+            "numberOfParticles": 10,
             "collectionOptions": {
                 "crystalStructure" : "pyramid",
                 "separation": 0,
